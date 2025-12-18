@@ -1,0 +1,32 @@
+# Binaries
+# Windows
+*.exe
+*.exe~
+*.dll
+# Mac/Linux
+*.dylib
+*.so
+/bin/
+/dist/
+main
+
+# Test Output
+*.out
+*.test
+
+# Go Workspace
+go.work
+
+# Dependencies
+# vendor/
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
