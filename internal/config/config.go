@@ -12,7 +12,8 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		RedisAddr: getEnv("REDIS_ADDR", "localhost:6379"),
-		DBDSN:     getEnv("DB_DSN", "postgres://user:password@localhost:5432/agentmesh?sslmode=disable"),
+		// DBDSN:     getEnv("DB_DSN", "postgres://user:123456@localhost:5432/agentmesh?sslmode=disable"),
+		DBDSN: "user=user password=123456 host=localhost port=5432 dbname=agentmesh sslmode=disable",
 	}
 }
 

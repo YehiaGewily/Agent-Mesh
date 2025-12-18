@@ -6,9 +6,26 @@ Typical Use Case: Orchestrating a fleet of specialized AI agents (e.g., Magnus, 
 
 ---
 
-## Architecture
+## 🚀 Architecture
 
 AgentMesh employs a **Producer-Broker-Worker** architecture with a focus on data integrity and high availability.
+
+```mermaid
+flowchart LR
+    Client([Client Request]) -->|POST /tasks| Producer[Producer API]
+    
+    subgraph Core Engine
+        Producer -->|Store Pending| DB[(PostgreSQL)]
+        Producer -->|Enqueue Job| Redis[(Redis Queue)]
+        
+        Redis -->|BRPOP Task| Worker[Worker Service]
+        Worker -->|Update Status| DB
+    end
+    
+    Worker -->|Execute AI Agent| AgentLogic{AI Processing}
+    AgentLogic -->|Success| Complete[Mark Completed]
+    AgentLogic -->|Fail| Retry[Retry / DLQ]
+```
 
 ### High-Level Data Flow
 
@@ -38,7 +55,7 @@ AgentMesh employs a **Producer-Broker-Worker** architecture with a focus on data
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```bash
 ├── cmd
@@ -57,7 +74,7 @@ AgentMesh employs a **Producer-Broker-Worker** architecture with a focus on data
 
 ---
 
-## 🤖 Supported Agents (The "Rankup" Squad)
+## Supported Agents (The "Rankup" Squad)
 
 AgentMesh is pre-configured to orchestrate specific agent personas:
 
@@ -67,7 +84,7 @@ AgentMesh is pre-configured to orchestrate specific agent personas:
 
 ---
 
-## ⚡ Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -115,7 +132,7 @@ go run cmd/producer/main.go
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 AgentMesh follows the **Twelve-Factor App** methodology. Configure via Environment Variables:
 
@@ -126,7 +143,7 @@ AgentMesh follows the **Twelve-Factor App** methodology. Configure via Environme
 
 ---
 
-## 🔧 Internal Mechanics Highlight
+## Internal Mechanics Highlight
 
 ### The "Claim" Pattern
 
