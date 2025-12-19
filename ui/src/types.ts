@@ -7,9 +7,9 @@ export const TaskStatus = {
 export type TaskStatus = typeof TaskStatus[keyof typeof TaskStatus];
 
 export const AgentType = {
-    Magnus: "MAGNUS_STRATEGIST",
-    Cedric: "CEDRIC_WRITER",
-    Lyra: "LYRA_AUDITOR"
+    Architect: "ARCHITECT",
+    Developer: "DEVELOPER",
+    QA: "QA_ENGINEER"
 } as const;
 export type AgentType = typeof AgentType[keyof typeof AgentType];
 
@@ -35,6 +35,7 @@ export interface SystemHealthMetric {
     worker_id: number;
     cpu_usage: number;
     ram_usage: number;
+    ram_used_mb: number;
     timestamp: string;
 }
 

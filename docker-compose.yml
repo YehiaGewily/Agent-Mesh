@@ -1,11 +1,11 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:alpine
     container_name: agentmesh_redis
     ports:
       - "6379:6379"
+    networks:
+      - agentmesh-net
     restart: always
 
   postgres:
@@ -19,7 +19,57 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - agentmesh-net
+    restart: always
+
+  producer:
+    build: .
+    container_name: agentmesh_producer
+    command: ./producer
+    environment:
+      - ENABLE_SIMULATOR=true
+      - DB_DSN=postgres://user:123456@postgres:5432/agentmesh?sslmode=disable
+      - REDIS_ADDR=redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - agentmesh-net
+    restart: always
+
+  worker:
+    build: .
+    # Remove fixed container_name to allow scaling
+    command: ./worker
+    deploy:
+      replicas: 3
+    environment:
+      - DB_DSN=postgres://user:123456@postgres:5432/agentmesh?sslmode=disable
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      - redis
+      - postgres
+      - producer
+    networks:
+      - agentmesh-net
+    restart: always
+
+  ui:
+    build: ./ui
+    container_name: agentmesh_ui
+    ports:
+      - "5173:80"
+    networks:
+      - agentmesh-net
     restart: always
 
 volumes:
   postgres_data:
+
+
+networks:
+  agentmesh-net:
+    driver: bridge

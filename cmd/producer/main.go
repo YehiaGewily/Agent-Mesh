@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -65,16 +67,15 @@ func main() {
 	}()
 
 	// Subscribe to System Health and broadcast to Hub
+	// Subscriptions...
 	go func() {
 		pubsub := redisBroker.SubscribeSystemHealth(context.Background())
 		defer pubsub.Close()
 		ch := pubsub.Channel()
 		for msg := range ch {
-			// Wrap in standardized envelope
 			wrapper := fmt.Sprintf(`{"type":"HEALTH_UPDATE","data":%s,"timestamp":"%s"}`,
 				msg.Payload,
 				time.Now().Format(time.RFC3339))
-
 			hub.Broadcast([]byte(wrapper))
 		}
 	}()
@@ -83,6 +84,12 @@ func main() {
 		Broker: redisBroker,
 		DB:     db,
 		Hub:    hub,
+	}
+
+	// CHECK FOR SIMULATION MODE
+	if os.Getenv("ENABLE_SIMULATOR") == "true" {
+		log.Println("⚠️  SIMULATION MODE ENABLED")
+		go p.startSimulation()
 	}
 
 	mux := http.NewServeMux()
@@ -95,6 +102,67 @@ func main() {
 	if err := http.ListenAndServe(":8081", mux); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
+}
+
+// startSimulation runs a background loop to generate random tasks
+func (p *Producer) startSimulation() {
+	// Seed random generator
+	// Note: In Go 1.20+ the global seed is auto-initialized, but for older versions:
+	// rand.Seed(time.Now().UnixNano())
+
+	agentTypes := []string{models.AgentTypeArchitect, models.AgentTypeDeveloper, models.AgentTypeQA}
+
+	for {
+		// Random Jitter: 3s to 7s
+		jitter := time.Duration(rand.Intn(4000)+3000) * time.Millisecond
+		time.Sleep(jitter)
+
+		// Create Random Task
+		agentType := agentTypes[rand.Intn(len(agentTypes))]
+		priority := rand.Intn(5) + 1 // 1-5
+
+		task := &models.Task{
+			ID:        uuid.New().String(),
+			Status:    models.TaskStatusPending,
+			Priority:  priority,
+			AgentType: agentType,
+			Payload: map[string]interface{}{
+				"source": "simulator",
+				"ts":     time.Now().Unix(),
+				"note":   "Automated drill",
+			},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+
+		if err := p.CreateTask(context.Background(), task); err != nil {
+			log.Printf("[SIMULATOR] Failed to create task: %v", err)
+			continue
+		}
+
+		log.Printf("[SIMULATOR] Generated Task %s (%s, P%d)", task.ID, task.AgentType, task.Priority)
+	}
+}
+
+// CreateTask handles persistence, enqueueing, and broadcasting
+func (p *Producer) CreateTask(ctx context.Context, task *models.Task) error {
+	// 1. Persist to DB
+	if err := p.DB.StoreTask(ctx, task); err != nil {
+		return fmt.Errorf("db store failed: %w", err)
+	}
+
+	// 2. Enqueue to Redis
+	if err := p.Broker.Enqueue(ctx, task.ID, task.Priority); err != nil {
+		return fmt.Errorf("redis enqueue failed: %w", err)
+	}
+
+	// 3. Broadcast Event
+	if err := p.Broker.PublishTaskEvent(ctx, task); err != nil {
+		log.Printf("Failed to broadcast task event: %v", err)
+		// Non-critical
+	}
+
+	return nil
 }
 
 func (p *Producer) handleCreateTask(w http.ResponseWriter, r *http.Request) {
@@ -110,15 +178,15 @@ func (p *Producer) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate Agent Type
-	if req.AgentType != models.AgentTypeMagnus &&
-		req.AgentType != models.AgentTypeCedric &&
-		req.AgentType != models.AgentTypeLyra {
+	if req.AgentType != models.AgentTypeArchitect &&
+		req.AgentType != models.AgentTypeDeveloper &&
+		req.AgentType != models.AgentTypeQA {
 		http.Error(w, fmt.Sprintf("Invalid agent_type. Must be one of: %s, %s, %s",
-			models.AgentTypeMagnus, models.AgentTypeCedric, models.AgentTypeLyra), http.StatusBadRequest)
+			models.AgentTypeArchitect, models.AgentTypeDeveloper, models.AgentTypeQA), http.StatusBadRequest)
 		return
 	}
 
-	// Create Task
+	// Create Task Object
 	task := &models.Task{
 		ID:        uuid.New().String(),
 		Status:    models.TaskStatusPending,
@@ -129,27 +197,14 @@ func (p *Producer) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: time.Now(),
 	}
 
-	// 1. Persist to DB
-	if err := p.DB.StoreTask(r.Context(), task); err != nil {
-		log.Printf("Failed to store task: %v", err)
+	// Use Shared Logic
+	if err := p.CreateTask(r.Context(), task); err != nil {
+		log.Printf("CreateTask failed: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Enqueue to Redis
-	if err := p.Broker.Enqueue(r.Context(), task.ID, task.Priority); err != nil {
-		log.Printf("Failed to enqueue task: %v", err)
-		http.Error(w, "Failed to enqueue task", http.StatusInternalServerError)
-		return
-	}
-
-	// 3. Broadcast Event
-	if err := p.Broker.PublishTaskEvent(r.Context(), task); err != nil {
-		log.Printf("Failed to broadcast task event: %v", err)
-		// Non-critical, continue
-	}
-
-	// 4. Respond
+	// Respond
 	w.WriteHeader(http.StatusAccepted)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(TaskResponse{

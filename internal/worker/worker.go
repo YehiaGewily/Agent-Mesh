@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/process"
 
 	"github.com/YehiaGewily/agentmesh/internal/models"
 	"github.com/YehiaGewily/agentmesh/pkg/broker"
@@ -58,18 +59,30 @@ func (w *Worker) StartHealthMonitor(ctx context.Context, workerID int) {
 				continue
 			}
 
-			// RAM Usage
-			v, err := mem.VirtualMemory()
-			if err != nil {
-				log.Printf("Error getting RAM: %v", err)
-				continue
+			// Process RAM Usage
+			proc, err := process.NewProcess(int32(os.Getpid()))
+			var ramMb float64
+			var ramPercent float64
+
+			if err == nil {
+				memInfo, err := proc.MemoryInfo()
+				if err == nil {
+					ramMb = float64(memInfo.RSS) / 1024 / 1024
+					// 512MB Soft Limit for bar calculation
+					ramPercent = (ramMb / 512.0) * 100
+				} else {
+					log.Printf("Error getting process memory: %v", err)
+				}
+			} else {
+				log.Printf("Error getting process: %v", err)
 			}
 
 			health := &models.SystemHealth{
 				ReqType:   "HEALTH_METRIC",
 				WorkerID:  workerID,
 				CPUUsage:  cpuPercent[0],
-				RAMUsage:  v.UsedPercent,
+				RAMUsage:  ramPercent,
+				RAMUsedMB: ramMb,
 				Timestamp: time.Now().Format(time.RFC3339),
 			}
 
@@ -115,8 +128,12 @@ func (w *Worker) processTask(ctx context.Context, workerID int, taskID string) {
 
 	log.Printf("[Worker %d] Processing task %s for %s (Priority: %d)", workerID, task.ID, task.AgentType, task.Priority)
 
-	if task.AgentType == models.AgentTypeMagnus {
-		log.Printf("[Worker %d] Starting Magnus Strategist Agent...", workerID)
+	if task.AgentType == models.AgentTypeArchitect {
+		log.Printf("[Worker %d] Starting System Architecture Analysis...", workerID)
+	} else if task.AgentType == models.AgentTypeDeveloper {
+		log.Printf("[Worker %d] Writing Code Implementation...", workerID)
+	} else if task.AgentType == models.AgentTypeQA {
+		log.Printf("[Worker %d] Running Test Suite...", workerID)
 	}
 
 	// 2. Simulate AI Processing

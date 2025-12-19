@@ -1,16 +1,24 @@
 import React from 'react';
 import type { Task } from '../types';
 import { TaskCard } from './TaskCard';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface TaskColumnProps {
     title: string;
     tasks: Task[];
     count: number;
     borderColor?: string;
+    limit?: number; // Optional limit for "Visual Virtualization"
 }
 
-export const TaskColumn: React.FC<TaskColumnProps> = ({ title, tasks, count, borderColor = "border-l-gray-800" }) => {
+export const TaskColumn: React.FC<TaskColumnProps> = ({ title, tasks, count, borderColor = "border-l-gray-800", limit }) => {
+    // Determine how many to show. If limit is undefined, show all (or default slice if we want safety, but let's respect the plan which says "Active: All")
+    // Actually, plan says Active: All. So if limit is undefined, we show all.
+    // But we previously hardcoded slice(0, 50). Let's use limit || length.
+    const showCount = limit || tasks.length;
+    const visibleTasks = tasks.slice(0, showCount);
+    const hiddenCount = tasks.length - visibleTasks.length;
+
     return (
         <div className={`bg-card/50 rounded-xl border border-gray-800/50 backdrop-blur-sm flex flex-col h-full overflow-hidden ${borderColor} border-l-4`}>
             {/* Header */}
@@ -25,12 +33,18 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({ title, tasks, count, bor
 
             {/* List */}
             <div className="flex-1 p-4 overflow-y-auto min-h-0">
-                <motion.div layout className="space-y-3">
-                    <AnimatePresence mode='popLayout'>
-                        {tasks.map((task) => (
-                            <TaskCard key={task.id} task={task} />
-                        ))}
-                    </AnimatePresence>
+                <motion.div className="space-y-3">
+                    {visibleTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} />
+                    ))}
+
+                    {hiddenCount > 0 && (
+                        <div className="text-center py-4">
+                            <span className="text-xs font-mono text-gray-500 bg-gray-800/50 px-3 py-1 rounded-full border border-gray-700">
+                                +{hiddenCount} more in queue
+                            </span>
+                        </div>
+                    )}
 
                     {tasks.length === 0 && (
                         <motion.div

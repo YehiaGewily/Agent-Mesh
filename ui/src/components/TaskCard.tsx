@@ -8,37 +8,33 @@ interface TaskCardProps {
     task: Task;
 }
 
-const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-};
 
 export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
     const [showModal, setShowModal] = useState(false);
 
     const getAgentColor = (type: string) => {
         switch (type) {
-            case AgentType.Magnus: return 'border-magnus shadow-glow-magnus text-magnus';
-            case AgentType.Cedric: return 'border-cedric shadow-glow-cedric text-cedric';
-            case AgentType.Lyra: return 'border-lyra shadow-glow-lyra text-lyra';
-            default: return 'border-gray-500 text-gray-400';
+            case AgentType.Architect: return 'border-l-orange-500 shadow-[inset_4px_0_0_0_rgba(249,115,22,0.6)]';
+            case AgentType.Developer: return 'border-l-blue-500 shadow-[inset_4px_0_0_0_rgba(59,130,246,0.6)]';
+            case AgentType.QA: return 'border-l-green-500 shadow-[inset_4px_0_0_0_rgba(34,197,94,0.6)]';
+            default: return 'border-l-gray-500';
         }
     };
 
-    const getAgentBg = (type: string) => {
+    const getAgentBadge = (type: string) => {
         switch (type) {
-            case AgentType.Magnus: return 'bg-magnus/10';
-            case AgentType.Cedric: return 'bg-cedric/10';
-            case AgentType.Lyra: return 'bg-lyra/10';
-            default: return 'bg-gray-800';
+            case AgentType.Architect: return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+            case AgentType.Developer: return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+            case AgentType.QA: return 'bg-green-500/10 text-green-400 border-green-500/20';
+            default: return 'bg-gray-500/10 text-gray-400';
         }
-    }
+    };
 
     const getAgentName = (type: string) => {
         switch (type) {
-            case AgentType.Magnus: return 'MAGNUS';
-            case AgentType.Cedric: return 'CEDRIC';
-            case AgentType.Lyra: return 'LYRA';
+            case AgentType.Architect: return 'ARCHITECT';
+            case AgentType.Developer: return 'DEVELOPER';
+            case AgentType.QA: return 'QA';
             default: return 'UNKNOWN';
         }
     }
@@ -68,18 +64,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
     return (
         <>
             <motion.div
-                layoutId={task.id}
-                variants={item}
-                initial="hidden"
-                animate="show"
                 exit={{ opacity: 0, scale: 0.9 }}
                 className={clsx(
                     "rounded-lg border-l-4 p-4 mb-3 bg-card border border-gray-800 hover:border-r-4 transition-all duration-300 backdrop-blur-sm",
                     getAgentColor(task.agent_type)
                 )}
             >
-                <div className="flex justify-between items-start mb-2">
-                    <span className={clsx("text-xs font-mono px-2 py-0.5 rounded uppercase font-bold tracking-wider", getAgentBg(task.agent_type))}>
+                <div className="flex justify-between items-start">
+                    <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider", getAgentBadge(task.agent_type))}>
                         {getAgentName(task.agent_type)}
                     </span>
                     <div className="flex items-center gap-2">

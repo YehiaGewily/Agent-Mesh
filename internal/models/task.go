@@ -4,9 +4,9 @@ import "time"
 
 // Agent Types (The Rankup Squad)
 const (
-	AgentTypeMagnus = "MAGNUS_STRATEGIST"
-	AgentTypeCedric = "CEDRIC_WRITER"
-	AgentTypeLyra   = "LYRA_AUDITOR"
+	AgentTypeArchitect = "ARCHITECT"
+	AgentTypeDeveloper = "DEVELOPER"
+	AgentTypeQA        = "QA_ENGINEER"
 )
 
 type TaskStatus string
@@ -33,6 +33,7 @@ type SystemHealth struct {
 	ReqType   string  `json:"type"` // "HEALTH_METRIC"
 	WorkerID  int     `json:"worker_id"`
 	CPUUsage  float64 `json:"cpu_usage"`
-	RAMUsage  float64 `json:"ram_usage"` // Used Percent
+	RAMUsage  float64 `json:"ram_usage"` // Used Percent of Soft Limit (512MB)
+	RAMUsedMB float64 `json:"ram_used_mb"`
 	Timestamp string  `json:"timestamp"`
 }

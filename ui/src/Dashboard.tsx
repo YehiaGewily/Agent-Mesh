@@ -7,6 +7,9 @@ const Dashboard: React.FC = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [workerHealth, setWorkerHealth] = useState<Record<number, SystemHealthMetric>>({});
     const [isConnected, setIsConnected] = useState(false);
+    const [highTrafficMode, setHighTrafficMode] = useState(false);
+
+    const messageBuffer = React.useRef<any[]>([]);
 
     useEffect(() => {
         const ws = new WebSocket('ws://localhost:8081/v1/ws');
@@ -24,57 +27,7 @@ const Dashboard: React.FC = () => {
         ws.onmessage = (event) => {
             try {
                 const rawData = JSON.parse(event.data);
-                console.log("WebSocket Message:", rawData);
-
-                // Handle Health Updates
-                if (rawData.type === "HEALTH_UPDATE") {
-                    const healthMsg = rawData as WebSocketPayload & { type: "HEALTH_UPDATE" };
-                    setWorkerHealth(prev => ({
-                        ...prev,
-                        [healthMsg.data.worker_id]: healthMsg.data
-                    }));
-                    return;
-                }
-
-                const data = rawData; // Fallback for existing task objects
-
-                // Handle different message formats
-                let updatedTask: Task;
-
-                // Case 1: Full Task object (has 'id')
-                if (data.id && data.status && data.agent_type) {
-                    updatedTask = data as Task;
-                }
-                // Case 2: Partial Update/Backend Event (has 'task_id')
-                // We map 'task_id' to 'id' to avoid crashes, but we might be missing other fields.
-                else if (data.task_id) {
-                    updatedTask = {
-                        id: data.task_id,
-                        status: data.status,
-                        // Provide defaults for missing fields to prevent rendering crashes
-                        agent_type: data.agent_type || 'UNKNOWN',
-                        priority: data.priority || 0,
-                        payload: data.payload || {},
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                    } as Task;
-                } else {
-                    console.warn("Received invalid task format:", data);
-                    return;
-                }
-
-                setTasks(prevTasks => {
-                    const existingTaskIndex = prevTasks.findIndex(t => t.id === updatedTask.id);
-                    if (existingTaskIndex >= 0) {
-                        const newTasks = [...prevTasks];
-                        // Merge existing with update to prevent data loss (e.g. payload)
-                        newTasks[existingTaskIndex] = { ...newTasks[existingTaskIndex], ...updatedTask };
-                        return newTasks;
-                    } else {
-                        return [...prevTasks, updatedTask];
-                    }
-                });
-
+                messageBuffer.current.push(rawData);
             } catch (err) {
                 console.error('Failed to parse WebSocket message:', err);
             }
@@ -84,6 +37,77 @@ const Dashboard: React.FC = () => {
             ws.close();
         };
     }, []);
+
+    // Flush buffer every 100ms (10 FPS)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const bufferSize = messageBuffer.current.length;
+
+            // Traffic Detection: if we processed more than 50 messages in this tick
+            if (bufferSize > 50) {
+                setHighTrafficMode(true);
+            } else if (bufferSize === 0 && highTrafficMode) {
+                // Optional: cooldown or keep it on for a bit. For now, immediate off when idle.
+                // Actually, let's keep it sticky for a moment or just check if buffer is consistently low.
+                // Simple approach: off if 0.
+                setHighTrafficMode(false);
+            }
+
+            if (bufferSize === 0) return;
+
+            const messages = [...messageBuffer.current];
+            messageBuffer.current = []; // Clear buffer
+
+            setTasks(prevTasks => {
+                let newTasks = [...prevTasks];
+                let healthUpdates: Record<number, SystemHealthMetric> = {};
+                let hasHealthUpdates = false;
+
+                messages.forEach(data => {
+                    // Handle Health Updates
+                    if (data.type === "HEALTH_UPDATE") {
+                        const healthMsg = data as WebSocketPayload & { type: "HEALTH_UPDATE" };
+                        healthUpdates[healthMsg.data.worker_id] = healthMsg.data;
+                        hasHealthUpdates = true;
+                        return;
+                    }
+
+                    // Handle Tasks
+                    let updatedTask: Task;
+                    if (data.id && data.status && data.agent_type) {
+                        updatedTask = data as Task;
+                    } else if (data.task_id) {
+                        updatedTask = {
+                            id: data.task_id,
+                            status: data.status,
+                            agent_type: data.agent_type || 'UNKNOWN',
+                            priority: data.priority || 0,
+                            payload: data.payload || {},
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        } as Task;
+                    } else {
+                        return;
+                    }
+
+                    const existingTaskIndex = newTasks.findIndex(t => t.id === updatedTask.id);
+                    if (existingTaskIndex >= 0) {
+                        newTasks[existingTaskIndex] = { ...newTasks[existingTaskIndex], ...updatedTask };
+                    } else {
+                        newTasks.push(updatedTask);
+                    }
+                });
+
+                if (hasHealthUpdates) {
+                    setWorkerHealth(prev => ({ ...prev, ...healthUpdates }));
+                }
+
+                return newTasks;
+            });
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, [highTrafficMode]);
 
     const pendingTasks = tasks.filter(t => t.status === TaskStatus.Pending);
     const activeTasks = tasks.filter(t => t.status === TaskStatus.Processing);
@@ -102,12 +126,17 @@ const Dashboard: React.FC = () => {
                         <span className={`text-xs font-bold font-mono ${isConnected ? 'text-green-500 shadow-glow-green' : 'text-red-500'}`}>
                             {isConnected ? 'ONLINE' : 'OFFLINE'}
                         </span>
+                        {highTrafficMode && (
+                            <span className="ml-4 text-xs font-bold font-mono text-amber-500 animate-pulse border border-amber-500/50 px-2 py-0.5 rounded bg-amber-500/10">
+                                ⚠️ HIGH TRAFFIC
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div className="flex gap-4 text-xs font-mono text-gray-400">
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-magnus"></div> Magnus</div>
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cedric"></div> Cedric</div>
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-lyra"></div> Lyra</div>
+                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500"></div> Architect</div>
+                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Developer</div>
+                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-500"></div> QA</div>
                 </div>
             </header>
 
@@ -119,6 +148,7 @@ const Dashboard: React.FC = () => {
                     tasks={pendingTasks}
                     count={pendingTasks.length}
                     borderColor="border-l-blue-500/30"
+                    limit={20}
                 />
                 <TaskColumn
                     title="ACTIVE OPERATIONS"
@@ -131,6 +161,7 @@ const Dashboard: React.FC = () => {
                     tasks={completedTasks}
                     count={completedTasks.length}
                     borderColor="border-l-purple-500/30"
+                    limit={15}
                 />
             </div>
         </div>

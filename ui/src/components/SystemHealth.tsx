@@ -90,9 +90,11 @@ export const SystemHealth: React.FC<SystemHealthProps> = ({ healthData }) => {
                                 <div>
                                     <div className="flex justify-between text-xs font-mono mb-1">
                                         <span className="text-gray-500 flex items-center gap-1">
-                                            <Zap size={10} /> MEM
+                                            <Zap size={10} /> MEM {metric.ram_used_mb ? `(${metric.ram_used_mb.toFixed(1)} MB)` : ''}
                                         </span>
-                                        <span className="text-white font-bold">{metric.ram_usage.toFixed(1)}%</span>
+                                        <span className="text-white font-bold">
+                                            {metric.ram_usage.toFixed(1)}% <span className="text-gray-600 text-[10px]">of 512MB</span>
+                                        </span>
                                     </div>
                                     <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                                         <motion.div
