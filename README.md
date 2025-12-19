@@ -6,7 +6,7 @@ Typical Use Case: Orchestrating a fleet of specialized AI agents (e.g., Magnus, 
 
 ---
 
-## 🚀 Architecture
+## Architecture
 
 AgentMesh employs a **Producer-Broker-Worker** architecture with a focus on data integrity and high availability.
 
@@ -46,7 +46,7 @@ flowchart LR
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 * **Language**: Go (Golang) 1.22+
 * **Broker**: Redis (using `go-redis/v9`)
