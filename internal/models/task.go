@@ -29,3 +29,10 @@ type Task struct {
 	CreatedAt  time.Time              `json:"created_at"`
 	UpdatedAt  time.Time              `json:"updated_at"`
 }
+type SystemHealth struct {
+	ReqType   string  `json:"type"` // "HEALTH_METRIC"
+	WorkerID  int     `json:"worker_id"`
+	CPUUsage  float64 `json:"cpu_usage"`
+	RAMUsage  float64 `json:"ram_usage"` // Used Percent
+	Timestamp string  `json:"timestamp"`
+}

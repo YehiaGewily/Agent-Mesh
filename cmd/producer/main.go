@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,11 +14,13 @@ import (
 	"github.com/YehiaGewily/agentmesh/internal/models"
 	"github.com/YehiaGewily/agentmesh/pkg/broker"
 	"github.com/YehiaGewily/agentmesh/pkg/database"
+	"github.com/YehiaGewily/agentmesh/pkg/notifications"
 )
 
 type Producer struct {
 	Broker *broker.RedisBroker
 	DB     *database.DB
+	Hub    *notifications.Hub
 }
 
 type TaskRequest struct {
@@ -46,16 +49,50 @@ func main() {
 	redisBroker := broker.NewBroker(cfg.RedisAddr, db)
 	fmt.Printf("Connected to Redis at: %s\n", cfg.RedisAddr)
 
+	// Initialize Notification Hub
+	hub := notifications.NewHub()
+	go hub.Run()
+
+	// Subscribe to Redis Updates and broadcast to Hub
+	// Subscribe to Redis Updates and broadcast to Hub
+	go func() {
+		pubsub := redisBroker.SubscribeTaskUpdates(context.Background())
+		defer pubsub.Close()
+		ch := pubsub.Channel()
+		for msg := range ch {
+			hub.Broadcast([]byte(msg.Payload))
+		}
+	}()
+
+	// Subscribe to System Health and broadcast to Hub
+	go func() {
+		pubsub := redisBroker.SubscribeSystemHealth(context.Background())
+		defer pubsub.Close()
+		ch := pubsub.Channel()
+		for msg := range ch {
+			// Wrap in standardized envelope
+			wrapper := fmt.Sprintf(`{"type":"HEALTH_UPDATE","data":%s,"timestamp":"%s"}`,
+				msg.Payload,
+				time.Now().Format(time.RFC3339))
+
+			hub.Broadcast([]byte(wrapper))
+		}
+	}()
+
 	p := &Producer{
 		Broker: redisBroker,
 		DB:     db,
+		Hub:    hub,
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/tasks", p.handleCreateTask)
+	mux.HandleFunc("/v1/ws", func(w http.ResponseWriter, r *http.Request) {
+		p.Hub.ServeWs(w, r)
+	})
 
-	log.Println("Producer API listening on :8080")
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	log.Println("Producer API listening on :8081 (WS at /v1/ws)")
+	if err := http.ListenAndServe(":8081", mux); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
@@ -106,7 +143,13 @@ func (p *Producer) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Respond
+	// 3. Broadcast Event
+	if err := p.Broker.PublishTaskEvent(r.Context(), task); err != nil {
+		log.Printf("Failed to broadcast task event: %v", err)
+		// Non-critical, continue
+	}
+
+	// 4. Respond
 	w.WriteHeader(http.StatusAccepted)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(TaskResponse{

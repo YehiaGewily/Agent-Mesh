@@ -47,6 +47,9 @@ func main() {
 		cancel()
 	}()
 
+	// Start Health Monitor
+	go w.StartHealthMonitor(ctx, 1) // Using ID 1 for single node monitoring for now
+
 	// Start with 5 concurrent workers
 	concurrency := 5
 	log.Printf("Starting %d concurrent workers...", concurrency)

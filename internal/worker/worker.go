@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
+
 	"github.com/YehiaGewily/agentmesh/internal/models"
 	"github.com/YehiaGewily/agentmesh/pkg/broker"
 	"github.com/YehiaGewily/agentmesh/pkg/database"
@@ -35,6 +38,46 @@ func (w *Worker) Start(ctx context.Context, concurrency int) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+func (w *Worker) StartHealthMonitor(ctx context.Context, workerID int) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	log.Printf("[HealthMonitor %d] Started", workerID)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// CPU Usage
+			cpuPercent, err := cpu.Percent(0, false)
+			if err != nil {
+				log.Printf("Error getting CPU: %v", err)
+				continue
+			}
+
+			// RAM Usage
+			v, err := mem.VirtualMemory()
+			if err != nil {
+				log.Printf("Error getting RAM: %v", err)
+				continue
+			}
+
+			health := &models.SystemHealth{
+				ReqType:   "HEALTH_METRIC",
+				WorkerID:  workerID,
+				CPUUsage:  cpuPercent[0],
+				RAMUsage:  v.UsedPercent,
+				Timestamp: time.Now().Format(time.RFC3339),
+			}
+
+			if err := w.Broker.PublishSystemHealth(ctx, health); err != nil {
+				log.Printf("Error publishing health: %v", err)
+			}
+		}
+	}
 }
 
 func (w *Worker) loop(ctx context.Context, workerID int) {
@@ -81,9 +124,20 @@ func (w *Worker) processTask(ctx context.Context, workerID int, taskID string) {
 
 	if err == nil {
 		// Success
+		now := time.Now()
 		if err := w.DB.UpdateTaskStatus(ctx, task.ID, models.TaskStatusCompleted); err != nil {
 			log.Printf("[Worker %d] Failed to mark task %s completed: %v", workerID, task.ID, err)
 		}
+
+		// Update struct for broadcast
+		task.Status = models.TaskStatusCompleted
+		task.UpdatedAt = now
+
+		// Broadcast Completion Event
+		if err := w.Broker.PublishTaskEvent(ctx, task); err != nil {
+			log.Printf("[Worker %d] Failed to broadcast completion for %s: %v", workerID, task.ID, err)
+		}
+
 		log.Printf("[Worker %d] Task %s completed successfully", workerID, task.ID)
 		return
 	}

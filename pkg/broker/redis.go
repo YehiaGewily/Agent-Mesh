@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -70,10 +71,11 @@ func (b *RedisBroker) FetchTask(ctx context.Context, queues ...string) (string, 
 	// Claim Pattern: Update status to running immediately
 	err = b.DB.UpdateTaskStatus(ctx, taskID, models.TaskStatusRunning)
 	if err != nil {
-		// Potential resilience issue here: if DB update fails, task is lost from Redis but not updated in DB.
-		// For now, we will just return the error. A robust system might verify integrity or use a reliable queue (RPOPLPUSH).
 		return "", fmt.Errorf("failed to claim task %s: %w", taskID, err)
 	}
+
+	// Notify Real-Time (Running)
+	b.PublishTaskUpdate(ctx, taskID, string(models.TaskStatusRunning))
 
 	return taskID, nil
 }
@@ -84,4 +86,47 @@ func (b *RedisBroker) AddToDLQ(ctx context.Context, taskID string) error {
 		return fmt.Errorf("failed to add to DLQ: %w", err)
 	}
 	return nil
+}
+
+func (b *RedisBroker) PublishTaskUpdate(ctx context.Context, taskID, status string) error {
+	msg := fmt.Sprintf(`{"task_id":"%s","status":"%s"}`, taskID, status)
+	err := b.Client.Publish(ctx, "task_updates", msg).Err()
+	if err != nil {
+		return fmt.Errorf("failed to publish update: %w", err)
+	}
+	return nil
+}
+
+func (b *RedisBroker) PublishTaskEvent(ctx context.Context, task *models.Task) error {
+	data, err := json.Marshal(task)
+	if err != nil {
+		return fmt.Errorf("failed to marshal task: %w", err)
+	}
+
+	err = b.Client.Publish(ctx, "task_updates", data).Err()
+	if err != nil {
+		return fmt.Errorf("failed to publish task event: %w", err)
+	}
+	return nil
+}
+
+func (b *RedisBroker) PublishSystemHealth(ctx context.Context, health *models.SystemHealth) error {
+	data, err := json.Marshal(health)
+	if err != nil {
+		return fmt.Errorf("failed to marshal health metric: %w", err)
+	}
+
+	err = b.Client.Publish(ctx, "system_health", data).Err()
+	if err != nil {
+		return fmt.Errorf("failed to publish health metric: %w", err)
+	}
+	return nil
+}
+
+func (b *RedisBroker) SubscribeSystemHealth(ctx context.Context) *redis.PubSub {
+	return b.Client.Subscribe(ctx, "system_health")
+}
+
+func (b *RedisBroker) SubscribeTaskUpdates(ctx context.Context) *redis.PubSub {
+	return b.Client.Subscribe(ctx, "task_updates")
 }
