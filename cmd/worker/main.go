@@ -8,10 +8,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/YehiaGewily/agentmesh/internal/config"
-	"github.com/YehiaGewily/agentmesh/internal/worker"
-	"github.com/YehiaGewily/agentmesh/pkg/broker"
-	"github.com/YehiaGewily/agentmesh/pkg/database"
+	"github.com/YehiaGewily/Agent-Mesh/internal/config"
+	"github.com/YehiaGewily/Agent-Mesh/internal/worker"
+	"github.com/YehiaGewily/Agent-Mesh/pkg/broker"
+	"github.com/YehiaGewily/Agent-Mesh/pkg/database"
 )
 
 func main() {

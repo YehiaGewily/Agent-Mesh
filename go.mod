@@ -1,4 +1,4 @@
-module github.com/YehiaGewily/agentmesh
+module github.com/YehiaGewily/Agent-Mesh
 
 go 1.23.0
 

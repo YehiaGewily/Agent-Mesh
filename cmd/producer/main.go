@@ -12,11 +12,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/YehiaGewily/agentmesh/internal/config"
-	"github.com/YehiaGewily/agentmesh/internal/models"
-	"github.com/YehiaGewily/agentmesh/pkg/broker"
-	"github.com/YehiaGewily/agentmesh/pkg/database"
-	"github.com/YehiaGewily/agentmesh/pkg/notifications"
+	"github.com/YehiaGewily/Agent-Mesh/internal/config"
+	"github.com/YehiaGewily/Agent-Mesh/internal/models"
+	"github.com/YehiaGewily/Agent-Mesh/pkg/broker"
+	"github.com/YehiaGewily/Agent-Mesh/pkg/database"
+	"github.com/YehiaGewily/Agent-Mesh/pkg/notifications"
 )
 
 type Producer struct {

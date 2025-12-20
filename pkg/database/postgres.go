@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/YehiaGewily/agentmesh/internal/models"
+	"github.com/YehiaGewily/Agent-Mesh/internal/models"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/YehiaGewily/agentmesh/internal/models"
-	"github.com/YehiaGewily/agentmesh/pkg/database"
+	"github.com/YehiaGewily/Agent-Mesh/internal/models"
+	"github.com/YehiaGewily/Agent-Mesh/pkg/database"
 	"github.com/redis/go-redis/v9"
 )
 

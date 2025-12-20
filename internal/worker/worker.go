@@ -12,9 +12,9 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/process"
 
-	"github.com/YehiaGewily/agentmesh/internal/models"
-	"github.com/YehiaGewily/agentmesh/pkg/broker"
-	"github.com/YehiaGewily/agentmesh/pkg/database"
+	"github.com/YehiaGewily/Agent-Mesh/internal/models"
+	"github.com/YehiaGewily/Agent-Mesh/pkg/broker"
+	"github.com/YehiaGewily/Agent-Mesh/pkg/database"
 )
 
 type Worker struct {
@@ -128,11 +128,12 @@ func (w *Worker) processTask(ctx context.Context, workerID int, taskID string) {
 
 	log.Printf("[Worker %d] Processing task %s for %s (Priority: %d)", workerID, task.ID, task.AgentType, task.Priority)
 
-	if task.AgentType == models.AgentTypeArchitect {
+	switch task.AgentType {
+	case models.AgentTypeArchitect:
 		log.Printf("[Worker %d] Starting System Architecture Analysis...", workerID)
-	} else if task.AgentType == models.AgentTypeDeveloper {
+	case models.AgentTypeDeveloper:
 		log.Printf("[Worker %d] Writing Code Implementation...", workerID)
-	} else if task.AgentType == models.AgentTypeQA {
+	case models.AgentTypeQA:
 		log.Printf("[Worker %d] Running Test Suite...", workerID)
 	}
 

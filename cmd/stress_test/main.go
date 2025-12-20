@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/YehiaGewily/agentmesh/internal/models"
+	"github.com/YehiaGewily/Agent-Mesh/internal/models"
 )
 
 // TaskRequest matches the JSON structure expected by the Producer
